@@ -1,6 +1,5 @@
 from flask import Blueprint, jsonify
 from db_config import get_db_connection
-from flask import request
 film_bp = Blueprint('film_bp', __name__)
 
 @film_bp.route('/api/film-details/<int:id>', methods=['GET'])
@@ -46,33 +45,6 @@ def get_actor_details(id):
             """
 
     cursor.execute(query, (id,))
-    results = cursor.fetchall()
-    cursor.close()
-    db.close()
-
-    return jsonify(results)
-
-@film_bp.route('/api/films', methods=['GET'])
-def get_films():
-    db = get_db_connection()
-    cursor = db.cursor(dictionary=True)
-
-    # Check if the user sent a search term
-    search_query = request.args.get('search')
-
-    if search_query:
-        sql = """
-            SELECT film_id, title, description, release_year, rating 
-            FROM film 
-            WHERE title LIKE %s 
-            LIMIT 50
-        """
-        cursor.execute(sql, (f"%{search_query}%",))
-    else:
-        # Gets first 50 films if no search term is provided
-        sql = "SELECT film_id, title, description, release_year, rating FROM film LIMIT 50"
-        cursor.execute(sql)
-
     results = cursor.fetchall()
     cursor.close()
     db.close()
