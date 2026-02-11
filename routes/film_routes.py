@@ -32,16 +32,20 @@ def get_actor_details(id):
     cursor = db.cursor(dictionary=True)
 
     query = """
-            SELECT a.actor_id, CONCAT(a.first_name, ' ', a.last_name) AS actor_name,
-                     GROUP_CONCAT(f.title SEPARATOR ', ') AS films
+            SELECT f.film_id, f.title AS film_title, COUNT(r.rental_id) AS rental_count
             FROM actor a
             JOIN film_actor fa ON a.actor_id = fa.actor_id
             JOIN film f ON fa.film_id = f.film_id
-            WHERE a.actor_id = %s;
+            JOIN inventory i ON f.film_id = i.film_id
+            JOIN rental r ON i.inventory_id = r.inventory_id
+            WHERE a.actor_id = %s
+            GROUP BY f.film_id, f.title
+            ORDER BY rental_count DESC
+            LIMIT 5;
             """
 
     cursor.execute(query, (id,))
-    results = cursor.fetchone()
+    results = cursor.fetchall()
     cursor.close()
     db.close()
 
