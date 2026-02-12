@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify
 from db_config import get_db_connection
+from flask import request
 film_bp = Blueprint('film_bp', __name__)
 
 @film_bp.route('/api/film-details/<int:id>', methods=['GET'])
@@ -45,6 +46,47 @@ def get_actor_details(id):
             """
 
     cursor.execute(query, (id,))
+    results = cursor.fetchall()
+    cursor.close()
+    db.close()
+
+    return jsonify(results)
+
+@film_bp.route('/api/films', methods=['GET'])
+def get_films():
+    db = get_db_connection()
+    cursor = db.cursor(dictionary=True)
+
+    search_query = request.args.get('search')
+
+    if search_query:
+        # Searches title OR category OR actor name
+        # Distinct avoids duplicates
+        sql = """
+            SELECT DISTINCT f.film_id, f.title, f.description, f.release_year, f.rating, c.name as category
+            FROM film f
+            JOIN film_category fc ON f.film_id = fc.film_id
+            JOIN category c ON fc.category_id = c.category_id
+            LEFT JOIN film_actor fa ON f.film_id = fa.film_id
+            LEFT JOIN actor a ON fa.actor_id = a.actor_id
+            WHERE f.title LIKE %s 
+               OR c.name LIKE %s 
+               OR CONCAT(a.first_name, ' ', a.last_name) LIKE %s
+            LIMIT 50;
+        """
+        wildcard = f"%{search_query}%"
+        cursor.execute(sql, (wildcard, wildcard, wildcard))
+    else:
+        # Default view
+        sql = """
+            SELECT f.film_id, f.title, f.description, f.release_year, f.rating, c.name as category
+            FROM film f
+            JOIN film_category fc ON f.film_id = fc.film_id
+            JOIN category c ON fc.category_id = c.category_id
+            LIMIT 50;
+        """
+        cursor.execute(sql)
+
     results = cursor.fetchall()
     cursor.close()
     db.close()
