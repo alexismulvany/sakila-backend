@@ -77,3 +77,41 @@ def get_customer_details(id):
         "profile": customer_profile,
         "rentals": rental_history
     })
+
+@customer_bp.route('/api/customers/<int:id>', methods=['PUT'])
+def update_customer(id):
+    data = request.get_json()
+    db = get_db_connection()
+    cursor = db.cursor(dictionary=True)
+
+    try:
+        # Update customer table with new first name, last name, and email
+        update_cust_sql = """
+            UPDATE customer 
+            SET first_name = %s, last_name = %s, email = %s 
+            WHERE customer_id = %s
+        """
+        cursor.execute(update_cust_sql, (data['first_name'], data['last_name'], data['email'], id))
+
+        # Find customer's address_id to update the address table
+        cursor.execute("SELECT address_id FROM customer WHERE customer_id = %s", (id,))
+        address_id = cursor.fetchone()['address_id']
+
+        # Updated the address and phone number in the address table
+        update_addr_sql = """
+            UPDATE address 
+            SET address = %s, phone = %s 
+            WHERE address_id = %s
+        """
+        cursor.execute(update_addr_sql, (data['address'], data['phone'], address_id))
+
+        db.commit()
+        return jsonify({"message": "Customer updated successfully!"})
+
+    #undo in case something goes wrong with the update
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        db.close()
