@@ -115,3 +115,38 @@ def update_customer(id):
     finally:
         cursor.close()
         db.close()
+
+
+@customer_bp.route('/api/customers', methods=['POST'])
+def add_customer():
+    data = request.get_json()
+    db = get_db_connection()
+    cursor = db.cursor(dictionary=True)
+
+    try:
+        # Inserts new address with default values for district and city
+        insert_addr_sql = """
+                          INSERT INTO address (address, phone, district, city_id, location)
+                          VALUES (%s, %s, 'N/A', 1, ST_GeomFromText('POINT(0 0)')) \
+                          """
+        cursor.execute(insert_addr_sql, (data['address'], data['phone']))
+
+        # Grab the ID of new address
+        new_address_id = cursor.lastrowid
+
+        # Inserts new customer with new address_id and default store_id and active status
+        insert_cust_sql = """
+                          INSERT INTO customer (store_id, first_name, last_name, email, address_id, active)
+                          VALUES (1, %s, %s, %s, %s, 1) \
+                          """
+        cursor.execute(insert_cust_sql, (data['first_name'], data['last_name'], data['email'], new_address_id))
+
+        db.commit()
+        return jsonify({"message": "New customer added successfully!"}), 201
+
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        db.close()
