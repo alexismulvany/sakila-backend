@@ -150,3 +150,35 @@ def add_customer():
     finally:
         cursor.close()
         db.close()
+
+
+@customer_bp.route('/api/customers/<int:id>', methods=['DELETE'])
+def delete_customer(id):
+    db = get_db_connection()
+    cursor = db.cursor(dictionary=True)
+
+    try:
+        # Check for unreturned rentals before allowing deletion
+        check_sql = "SELECT COUNT(*) as unreturned FROM rental WHERE customer_id = %s AND return_date IS NULL"
+        cursor.execute(check_sql, (id,))
+        result = cursor.fetchone()
+
+        if result['unreturned'] > 0:
+            return jsonify({"error": "Customer must return all films before they can be deleted!"}), 400
+
+        # We need to delete the payments and rentals first because of the foreign key constraints
+        cursor.execute("DELETE FROM payment WHERE customer_id = %s", (id,))
+        cursor.execute("DELETE FROM rental WHERE customer_id = %s", (id,))
+
+        # Delete customer
+        cursor.execute("DELETE FROM customer WHERE customer_id = %s", (id,))
+
+        db.commit()
+        return jsonify({"message": "Customer deleted successfully!"}), 200
+
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        db.close()
