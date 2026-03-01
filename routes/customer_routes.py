@@ -57,15 +57,16 @@ def get_customer_details(id):
     customer_profile = cursor.fetchone()
 
     # Customer rental history (limit 20)
+    # 2. Get the Customer's Rental History (Update this query!)
     history_sql = """
-        SELECT f.title, r.rental_date, r.return_date
-        FROM rental r
-        JOIN inventory i ON r.inventory_id = i.inventory_id
-        JOIN film f ON i.film_id = f.film_id
-        WHERE r.customer_id = %s
-        ORDER BY r.rental_date DESC
-        LIMIT 20
-    """
+                  SELECT r.rental_id, f.title, r.rental_date, r.return_date
+                  FROM rental r
+                           JOIN inventory i ON r.inventory_id = i.inventory_id
+                           JOIN film f ON i.film_id = f.film_id
+                  WHERE r.customer_id = %s
+                  ORDER BY r.rental_date DESC
+                  LIMIT 20 \
+                  """
     cursor.execute(history_sql, (id,))
     rental_history = cursor.fetchall()
 
@@ -175,6 +176,27 @@ def delete_customer(id):
 
         db.commit()
         return jsonify({"message": "Customer deleted successfully!"}), 200
+
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        db.close()
+
+
+@customer_bp.route('/api/rentals/<int:rental_id>/return', methods=['PUT'])
+def return_rental(rental_id):
+    db = get_db_connection()
+    cursor = db.cursor()
+
+    try:
+        # Update the return_date
+        update_sql = "UPDATE rental SET return_date = NOW() WHERE rental_id = %s"
+        cursor.execute(update_sql, (rental_id,))
+
+        db.commit()
+        return jsonify({"message": "The film has successfully been returned!"}), 200
 
     except Exception as e:
         db.rollback()
