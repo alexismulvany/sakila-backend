@@ -142,3 +142,64 @@ def rent_film():
     finally:
         cursor.close()
         db.close()
+
+
+@film_bp.route('/api/films/<int:film_id>/availability', methods=['GET'])
+def check_film_availability(film_id):
+    db = get_db_connection()
+    cursor = db.cursor(dictionary=True)
+
+    try:
+        # Find all inventory items for this film that are in stock
+        check_sql = """
+                    SELECT i.inventory_id
+                    FROM inventory i
+                    WHERE i.film_id = %s \
+                      AND i.store_id = 1
+                      AND i.inventory_id NOT IN (SELECT inventory_id \
+                                                 FROM rental \
+                                                 WHERE return_date IS NULL) \
+                    """
+        cursor.execute(check_sql, (film_id,))
+        available_items = cursor.fetchall()
+
+        available_count = len(available_items)
+
+        # ID of the tape that is available for rent (if any)
+        first_available_id = available_items[0]['inventory_id'] if available_count > 0 else None
+
+        return jsonify({
+            "stock": available_count,
+            "inventory_id": first_available_id
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        db.close()
+
+
+@film_bp.route('/api/rentals', methods=['POST'])
+def create_rental():
+    data = request.get_json()
+    db = get_db_connection()
+    cursor = db.cursor()
+
+    try:
+        # Create a new rental record with the current date/time
+        insert_sql = """
+                     INSERT INTO rental (rental_date, inventory_id, customer_id, staff_id)
+                     VALUES (NOW(), %s, %s, 1) \
+                     """
+        cursor.execute(insert_sql, (data['inventory_id'], data['customer_id']))
+
+        db.commit()  # Save the transaction
+        return jsonify({"message": "Rental processed successfully!"}), 201
+
+    except Exception as e:
+        db.rollback()  # Undo if something broke
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        db.close()
